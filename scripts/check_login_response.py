@@ -1,7 +1,7 @@
 import json
 import urllib.request
 
-payload = {"username": "jj.himenez", "password": "ChangeMe123!"}
+payload = {"username": "superadmin", "password": "Superadmin123!"}
 req = urllib.request.Request(
     "http://localhost:8000/login",
     data=json.dumps(payload).encode(),

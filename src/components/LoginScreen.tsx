@@ -6,6 +6,7 @@ import type { User } from "../types";
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SEQUENCE = [30, 60, 180, 300, 900, 1800, 3600, 43200, 86400];
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 const formatDuration = (seconds: number) => {
   if (seconds < 60) return `${seconds} seconds`;
@@ -57,7 +58,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
