@@ -5,7 +5,14 @@ import campusBg from "@/imports/IMG_3926.JPG";
 import type { User } from "../types";
 
 const MAX_ATTEMPTS = 3;
-const LOCKOUT_SECONDS = 5 * 60; // 5 minutes
+const LOCKOUT_SEQUENCE = [30, 60, 180, 300, 900, 1800, 3600, 43200, 86400];
+
+const formatDuration = (seconds: number) => {
+  if (seconds < 60) return `${seconds} seconds`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
+  return `${Math.floor(seconds / 86400)} day${Math.floor(seconds / 86400) > 1 ? "s" : ""}`;
+};
 
 export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
   const [username, setUsername] = useState("");
@@ -14,6 +21,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
+  const [lockoutStage, setLockoutStage] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -68,23 +76,34 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
           facility: data.facility,
         };
         setAttempts(0);
+        setLockoutStage(0);
         onLogin(user);
       } else {
         const next = attempts + 1;
+        const shouldLock = next >= MAX_ATTEMPTS || lockoutStage > 0;
         setAttempts(next);
-        if (next >= MAX_ATTEMPTS) {
-          setLockedUntil(Date.now() + LOCKOUT_SECONDS * 1000);
-          setError("Too many failed attempts. Account locked for 5 minutes.");
+
+        if (shouldLock) {
+          const duration = LOCKOUT_SEQUENCE[Math.min(lockoutStage, LOCKOUT_SEQUENCE.length - 1)];
+          setLockedUntil(Date.now() + duration * 1000);
+          setLockoutStage((prev) => Math.min(prev + 1, LOCKOUT_SEQUENCE.length - 1));
+          setAttempts(0);
+          setError(`Too many failed attempts. Account locked for ${formatDuration(duration)}.`);
         } else {
           setError(`Invalid username or password. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? "" : "s"} remaining.`);
         }
       }
     } catch {
       const next = attempts + 1;
+      const shouldLock = next >= MAX_ATTEMPTS || lockoutStage > 0;
       setAttempts(next);
-      if (next >= MAX_ATTEMPTS) {
-        setLockedUntil(Date.now() + LOCKOUT_SECONDS * 1000);
-        setError("Too many failed attempts. Account locked for 5 minutes.");
+
+      if (shouldLock) {
+        const duration = LOCKOUT_SEQUENCE[Math.min(lockoutStage, LOCKOUT_SEQUENCE.length - 1)];
+        setLockedUntil(Date.now() + duration * 1000);
+        setLockoutStage((prev) => Math.min(prev + 1, LOCKOUT_SEQUENCE.length - 1));
+        setAttempts(0);
+        setError(`Too many failed attempts. Account locked for ${formatDuration(duration)}.`);
       } else {
         setError(`Connection error. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? "" : "s"} remaining.`);
       }
@@ -155,7 +174,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
                 <p style={{ margin: 0, color: "#B91C1C", fontSize: 12 }}>{error}</p>
                 {attempts >= 2 && (
                   <p style={{ margin: "4px 0 0", fontSize: 11, color: "#7F8C8D" }}>
-                    1 attempt left before lockout.{" "}
+                    2 attempts reached — consider using the forgot password option.{" "}
                     <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#2D7A4F", textDecoration: "none" }}>Forgot password?</a>
                   </p>
                 )}

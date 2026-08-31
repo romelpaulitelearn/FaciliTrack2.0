@@ -25,6 +25,7 @@ function PasswordStrength({ password }: { password: string }) {
 function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Admin) => void; onClose: () => void }) {
   const [form, setForm] = useState({
     name: admin?.name ?? "",
+    email: admin?.email ?? "",
     username: admin?.username ?? "",
     password: admin?.password ?? "",
     facilities: admin?.facilities ?? [],
@@ -45,13 +46,18 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
           onSubmit={(e) => { e.preventDefault(); onSave({ ...form, id: admin?.id ?? String(Date.now()) }); }}
           style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}
         >
-          {[["Full Name","name","e.g. Jefferson Gabriel"], ["Username","username","e.g. jgabriel"]].map(([label, key, ph]) => (
+          {[
+            ["Full Name", "name", "e.g. Jefferson Gabriel"],
+            ["Email", "email", "e.g. jgabriel@school.edu"],
+            ["Username", "username", "e.g. jgabriel"],
+          ].map(([label, key, ph]) => (
             <div key={key}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#2C3E50", marginBottom: 5 }}>{label}</label>
               <input
-                value={form[key as "name" | "username"]}
+                value={form[key as "name" | "email" | "username"]}
                 onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                placeholder={ph} required
+                placeholder={ph} required={key !== "email" ? true : true}
+                type={key === "email" ? "email" : "text"}
                 style={{ width: "100%", padding: "9px 12px", border: "0.5px solid #e0e0e0", borderRadius: 6, fontSize: 13, boxSizing: "border-box", outline: "none", color: "#2C3E50" }}
               />
             </div>
@@ -113,7 +119,7 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
   );
 }
 
-export default function ManageAdminTab() {
+export default function ManageAdminTab({ addToast }: { addToast?: (message: string, type?: "success" | "error" | "info") => void }) {
   const [admins, setAdmins] = useState<Admin[]>(MOCK_ADMINS);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
@@ -130,6 +136,7 @@ export default function ManageAdminTab() {
           const mapped = data.map((item: any) => ({
             id: String(item.id),
             name: item.name,
+            email: item.email || `${item.username}@school.edu`,
             username: item.username,
             password: "",
             facilities: Array.isArray(item.facilities) ? item.facilities : [item.facilities || ""].filter(Boolean),
@@ -153,6 +160,7 @@ export default function ManageAdminTab() {
   const handleSave = async (a: Admin) => {
     const payload = {
       name: a.name,
+      email: a.email,
       username: a.username,
       password: a.password,
       facilities: a.facilities,
@@ -172,6 +180,7 @@ export default function ManageAdminTab() {
         const normalized = {
           id: String(saved.id ?? a.id ?? Date.now()),
           name: saved.name ?? a.name,
+          email: saved.email ?? a.email ?? `${a.username}@school.edu`,
           username: saved.username ?? a.username,
           password: a.password,
           facilities: Array.isArray(saved.facilities) ? saved.facilities : a.facilities,
@@ -180,11 +189,14 @@ export default function ManageAdminTab() {
         setAdmins((prev) => prev.find((x) => x.id === normalized.id)
           ? prev.map((x) => x.id === normalized.id ? normalized : x)
           : [normalized, ...prev]);
+        addToast?.(isUpdate ? "Admin updated successfully." : "Admin created successfully.", "success");
       } else {
         setAdmins((prev) => prev.find((x) => x.id === a.id) ? prev.map((x) => x.id === a.id ? a : x) : [a, ...prev]);
+        addToast?.(isUpdate ? "Failed to update admin." : "Failed to create admin.", "error");
       }
     } catch {
       setAdmins((prev) => prev.find((x) => x.id === a.id) ? prev.map((x) => x.id === a.id ? a : x) : [a, ...prev]);
+      addToast?.("Unable to save admin. Please try again.", "error");
     }
 
     setModal(null);
@@ -215,7 +227,7 @@ export default function ManageAdminTab() {
           <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "0.5px solid #e0e0e0", background: "#f8fafa" }}>
-                {["Name", "Username", "Facilities Assigned", "Status", "Actions"].map((h) => (
+                {["Name", "Email", "Username", "Facilities Assigned", "Status", "Actions"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 16px", fontWeight: 500, color: "#7F8C8D", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -237,6 +249,9 @@ export default function ManageAdminTab() {
                       <span style={{ fontWeight: 500 }}>{admin.name}</span>
                     </div>
                   </td>
+
+                  {/* Email */}
+                  <td style={{ padding: "12px 16px", color: "#7F8C8D" }}>{admin.email || "—"}</td>
 
                   {/* Username */}
                   <td style={{ padding: "12px 16px", color: "#7F8C8D", fontFamily: "monospace" }}>{admin.username}</td>
@@ -309,9 +324,13 @@ export default function ManageAdminTab() {
                   const response = await fetch(`http://localhost:8000/admins/${deleteId}`, { method: "DELETE" });
                   if (response.ok) {
                     setAdmins((p) => p.filter((a) => a.id !== deleteId));
+                    addToast?.("Admin deleted successfully.", "success");
+                  } else {
+                    addToast?.("Failed to delete admin.", "error");
                   }
                 } catch {
                   setAdmins((p) => p.filter((a) => a.id !== deleteId));
+                  addToast?.("Unable to delete admin. Please try again.", "error");
                 }
                 setDeleteId(null);
               }}

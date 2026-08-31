@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Clock, Users, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { getFacilityByName, type Facility, type FacilityRoom } from "../../facilityData";
+import { FACILITIES_DATA, getFacilityByName, type Facility, type FacilityRoom } from "../../facilityData";
 import type { User } from "../../types";
 
 function FacilitySection({ facility, rooms }: { facility: Facility; rooms: FacilityRoom[] }) {
@@ -128,11 +128,26 @@ function FacilitySection({ facility, rooms }: { facility: Facility; rooms: Facil
 }
 
 export default function FacilitiesTab({ user, rooms }: { user?: User; rooms?: unknown }) {
-  const assignedFacility = user?.facility ? getFacilityByName(user.facility) : undefined;
-  const filteredFacilities = assignedFacility ? [assignedFacility] : FACILITIES_DATA;
+  const assignedFacility = user?.facility ? getFacilityByName(user.facility.trim()) : undefined;
+  const filteredFacilities = user?.role === "admin"
+    ? (assignedFacility ? [assignedFacility] : [])
+    : FACILITIES_DATA;
   const totalAvailable = filteredFacilities.reduce((s, f) => s + f.rooms.filter((r) => r.status === "Available").length, 0);
   const totalOccupied = filteredFacilities.reduce((s, f) => s + f.rooms.filter((r) => r.status === "Occupied").length, 0);
   const totalRooms = filteredFacilities.reduce((s, f) => s + f.rooms.length, 0);
+
+  if (user?.role === "admin" && !assignedFacility) {
+    return (
+      <div className="fade-in" style={{ padding: 32 }}>
+        <div style={{ background: "white", border: "0.5px solid #e0e0e0", borderRadius: 8, padding: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1B4D3E", margin: 0, marginBottom: 8 }}>Facilities</h2>
+          <p style={{ margin: 0, color: "#7F8C8D", fontSize: 13 }}>
+            No facility assignment is available for this admin account.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in" style={{ padding: 32 }}>
@@ -148,13 +163,13 @@ export default function FacilitiesTab({ user, rooms }: { user?: User; rooms?: un
           </span>
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#7F8C8D" }}>
-          {FACILITIES_DATA.length} facilities · {totalRooms} rooms total — click a facility to collapse/expand
+          {filteredFacilities.length} facilities · {totalRooms} rooms total — click a facility to collapse/expand
         </p>
       </div>
 
       {/* Facility sections */}
       {filteredFacilities.map((facility) => (
-        <FacilitySection key={facility.id} facility={facility} />
+        <FacilitySection key={facility.id} facility={facility} rooms={facility.rooms} />
       ))}
 
       {/* Legend */}

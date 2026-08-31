@@ -68,7 +68,7 @@ VALUES (
   'superadmin@school.edu',
   'Rommel Paulite',
   'superadmin',
-  '1f5b2e8dfd2e876e479c3922e167b48e3512b1aac087cb879e9a883e736d3d5797ece20e23d57c88e56ed1ee268d5f44ee40ff2584767d9cfc392a4081d2f070',
+  'Superadmin123!',
   'Super Admin',
   'active'
 )
@@ -83,11 +83,11 @@ ON CONFLICT(username) DO UPDATE SET
 -- Seed 5 Admin Accounts
 INSERT INTO admins (email, fullname, username, password, facilities_assign, status)
 VALUES
-  ('admin1@school.edu', 'Admin One', 'admin1', 'cf2974623263087860e2a8e6a6376665e8416f4eb5c462e6c1e98a673a6a996ebec9b4aa390f3f7b0cfd24e6fd72be3334e6766c28f234fb540ea4aa44532c40', 'Computer Laboratory', 'active'),
-  ('admin2@school.edu', 'Admin Two', 'admin2', 'cf2974623263087860e2a8e6a6376665e8416f4eb5c462e6c1e98a673a6a996ebec9b4aa390f3f7b0cfd24e6fd72be3334e6766c28f234fb540ea4aa44532c40', 'Science & Physics Lab', 'active'),
-  ('admin3@school.edu', 'Admin Three', 'admin3', 'cf2974623263087860e2a8e6a6376665e8416f4eb5c462e6c1e98a673a6a996ebec9b4aa390f3f7b0cfd24e6fd72be3334e6766c28f234fb540ea4aa44532c40', 'Tertiary Classroom', 'active'),
-  ('admin4@school.edu', 'Admin Four', 'admin4', 'cf2974623263087860e2a8e6a6376665e8416f4eb5c462e6c1e98a673a6a996ebec9b4aa390f3f7b0cfd24e6fd72be3334e6766c28f234fb540ea4aa44532c40', 'Hotel Restaurant Management', 'active'),
-  ('admin5@school.edu', 'Admin Five', 'admin5', 'cf2974623263087860e2a8e6a6376665e8416f4eb5c462e6c1e98a673a6a996ebec9b4aa390f3f7b0cfd24e6fd72be3334e6766c28f234fb540ea4aa44532c40', 'Gymnasium', 'active')
+  ('admin1@school.edu', 'Admin One', 'admin1', 'ChangeMe123!', 'Computer Laboratory', 'active'),
+  ('admin2@school.edu', 'Admin Two', 'admin2', 'ChangeMe123!', 'Science & Physics Lab', 'active'),
+  ('admin3@school.edu', 'Admin Three', 'admin3', 'ChangeMe123!', 'Tertiary Classroom', 'active'),
+  ('admin4@school.edu', 'Admin Four', 'admin4', 'ChangeMe123!', 'Hotel Restaurant Management', 'active'),
+  ('admin5@school.edu', 'Admin Five', 'admin5', 'ChangeMe123!', 'Gymnasium', 'active')
 ON CONFLICT(username) DO UPDATE SET
   email = excluded.email,
   fullname = excluded.fullname,

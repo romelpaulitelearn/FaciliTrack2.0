@@ -14,6 +14,7 @@ export type AdminTab = "dashboard" | "facilities" | "reservations" | "settings";
 export interface Admin {
   id: string;
   name: string;
+  email: string;
   username: string;
   password: string;
   facilities: string[];

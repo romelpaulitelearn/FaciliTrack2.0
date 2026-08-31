@@ -33,7 +33,7 @@ export default function SuperadminDashboard({ user, onLogout }: { user: User; on
       />
       <main style={{ flex: 1, overflowY: "auto" }}>
         {activeTab === "dashboard" && <OverviewTab />}
-        {activeTab === "manage-admin" && <ManageAdminTab />}
+        {activeTab === "manage-admin" && <ManageAdminTab addToast={addToast} />}
         {activeTab === "settings" && <SettingsTab user={user} addToast={addToast} />}
       </main>
       <ToastContainer toasts={toasts} onRemove={removeToast} />

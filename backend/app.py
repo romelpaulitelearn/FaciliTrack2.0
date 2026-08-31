@@ -28,6 +28,7 @@ LOCAL_DB_PATH = os.path.join(os.path.dirname(__file__), "facilitrack_local.db")
 
 class AdminCreateRequest(BaseModel):
     name: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=1)
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=6)
     facilities: list[str] = Field(default_factory=list)
@@ -36,6 +37,7 @@ class AdminCreateRequest(BaseModel):
 
 class AdminUpdateRequest(BaseModel):
     name: Optional[str] = None
+    email: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
     facilities: Optional[list[str]] = None
@@ -94,22 +96,41 @@ def password_matches(stored_password: Optional[str], supplied_password: str) -> 
     return False
 
 
+def normalize_facility_value(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        candidates = [str(item).strip() for item in value if str(item).strip()]
+        return candidates[0] if candidates else ""
+    if isinstance(value, str):
+        candidates = [item.strip() for item in value.split(",") if item.strip()]
+        return candidates[0] if candidates else ""
+    return str(value).strip()
+
+
 def ensure_local_admin_table() -> None:
     conn = sqlite3.connect(LOCAL_DB_PATH)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            facilities TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Active',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+    columns = conn.execute("PRAGMA table_info(admins)").fetchall()
+    if not columns:
+        conn.execute(
+            """
+            CREATE TABLE admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL DEFAULT '',
+                username TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                facilities TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
+    else:
+        existing = {column[1] for column in columns}
+        if "email" not in existing:
+            conn.execute("ALTER TABLE admins ADD COLUMN email TEXT NOT NULL DEFAULT ''")
     conn.commit()
     conn.close()
 
@@ -132,7 +153,7 @@ def run_d1_sql(command: str):
 
 def persist_admin_to_d1(payload: AdminCreateRequest):
     facility = payload.facilities[0] if payload.facilities else ""
-    email = f"{payload.username}@school.edu"
+    email = payload.email.strip() or f"{payload.username}@school.edu"
     insert_sql = (
         "INSERT INTO admins (email, fullname, username, password, facilities_assign, status) "
         f"VALUES ('{sql_literal(email)}', '{sql_literal(payload.name)}', '{sql_literal(payload.username)}', '{sql_literal(payload.password)}', '{sql_literal(facility)}', '{sql_literal(payload.status)}');"
@@ -157,9 +178,10 @@ def create_local_admin(payload: AdminCreateRequest):
     ensure_local_admin_table()
     conn = sqlite3.connect(LOCAL_DB_PATH)
     conn.execute(
-        "INSERT INTO admins (name, username, password, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO admins (name, email, username, password, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             payload.name,
+            payload.email.strip() or f"{payload.username}@school.edu",
             payload.username,
             payload.password,
             ", ".join(payload.facilities),
@@ -171,16 +193,17 @@ def create_local_admin(payload: AdminCreateRequest):
     conn.commit()
     admin_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()[0]
     row = conn.execute(
-        "SELECT id, name, username, facilities, status FROM admins WHERE id = ?",
+        "SELECT id, name, email, username, facilities, status FROM admins WHERE id = ?",
         (admin_id,),
     ).fetchone()
     conn.close()
     return {
         "id": row[0],
         "name": row[1],
-        "username": row[2],
-        "facilities": [item.strip() for item in (row[3] or "").split(",") if item.strip()],
-        "status": row[4],
+        "email": row[2],
+        "username": row[3],
+        "facilities": [item.strip() for item in (row[4] or "").split(",") if item.strip()],
+        "status": row[5],
     }
 
 
@@ -207,16 +230,17 @@ def list_admins():
     ensure_local_admin_table()
     conn = sqlite3.connect(LOCAL_DB_PATH)
     rows = conn.execute(
-        "SELECT id, name, username, facilities, status FROM admins ORDER BY id DESC"
+        "SELECT id, name, email, username, facilities, status FROM admins ORDER BY id DESC"
     ).fetchall()
     conn.close()
     return [
         {
             "id": row[0],
             "name": row[1],
-            "username": row[2],
-            "facilities": [item.strip() for item in (row[3] or "").split(",") if item.strip()],
-            "status": row[4],
+            "email": row[2] or f"{row[3]}@school.edu",
+            "username": row[3],
+            "facilities": [item.strip() for item in (row[4] or "").split(",") if item.strip()],
+            "status": row[5],
         }
         for row in rows
     ]
@@ -270,6 +294,9 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
     if payload.name is not None:
         updates.append("name = ?")
         values.append(payload.name)
+    if payload.email is not None:
+        updates.append("email = ?")
+        values.append(payload.email.strip() or "")
     if payload.username is not None:
         updates.append("username = ?")
         values.append(payload.username)
@@ -290,14 +317,15 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
     values.extend([datetime.utcnow().isoformat(), admin_id])
     conn.execute(f"UPDATE admins SET {', '.join(updates)}, updated_at = ? WHERE id = ?", values)
     conn.commit()
-    updated = conn.execute("SELECT id, name, username, facilities, status FROM admins WHERE id = ?", (admin_id,)).fetchone()
+    updated = conn.execute("SELECT id, name, email, username, facilities, status FROM admins WHERE id = ?", (admin_id,)).fetchone()
     conn.close()
     return {
         "id": updated[0],
         "name": updated[1],
-        "username": updated[2],
-        "facilities": [item.strip() for item in (updated[3] or "").split(",") if item.strip()],
-        "status": updated[4],
+        "email": updated[2] or f"{updated[3]}@school.edu",
+        "username": updated[3],
+        "facilities": [item.strip() for item in (updated[4] or "").split(",") if item.strip()],
+        "status": updated[5],
     }
 
 
@@ -337,18 +365,18 @@ def login(payload: LoginRequest):
                         name=db_name,
                         username=db_username,
                         role="admin",
-                        facility=db_facility,
+                        facility=normalize_facility_value(db_facility),
                     ).model_dump()
             conn.close()
 
         ensure_local_admin_table()
         conn = sqlite3.connect(LOCAL_DB_PATH)
         local_super_row = conn.execute(
-            "SELECT id, name, username, password, status FROM admins WHERE username = ? LIMIT 1",
+            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? LIMIT 1",
             (payload.username,),
         ).fetchone()
         if local_super_row:
-            db_id, db_name, db_username, db_password, db_status = local_super_row
+            db_id, db_name, db_username, db_password, db_facilities, db_status = local_super_row
             if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
                 conn.close()
                 return LoginResponse(
@@ -356,7 +384,7 @@ def login(payload: LoginRequest):
                     name=db_name,
                     username=db_username,
                     role="admin",
-                    facility="",
+                    facility=normalize_facility_value(db_facilities),
                 ).model_dump()
         conn.close()
 
