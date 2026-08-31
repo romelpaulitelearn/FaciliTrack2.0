@@ -2,6 +2,7 @@ import hashlib
 import os
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime
 from typing import Literal, Optional
 
@@ -108,6 +109,29 @@ def normalize_facility_value(value) -> str:
     return str(value).strip()
 
 
+def ensure_local_super_admin_table() -> None:
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    columns = conn.execute("PRAGMA table_info(super_admins)").fetchall()
+    if not columns:
+        conn.execute(
+            """
+            CREATE TABLE super_admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL DEFAULT '',
+                fullname TEXT NOT NULL,
+                username TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                title TEXT DEFAULT 'Super Admin',
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    conn.commit()
+    conn.close()
+
+
 def ensure_local_admin_table() -> None:
     conn = sqlite3.connect(LOCAL_DB_PATH)
     columns = conn.execute("PRAGMA table_info(admins)").fetchall()
@@ -135,6 +159,70 @@ def ensure_local_admin_table() -> None:
     conn.close()
 
 
+def seed_default_accounts() -> None:
+    ensure_local_admin_table()
+    ensure_local_super_admin_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    default_rows = [
+        (
+            "super_admins",
+            "superadmin",
+            "Rommel Paulite",
+            "superadmin@school.edu",
+            "Superadmin123!",
+            "Super Admin",
+            "active",
+        ),
+        (
+            "admins",
+            "admin1",
+            "Admin One",
+            "admin1@school.edu",
+            "ChangeMe123!",
+            "Computer Laboratory",
+            "Active",
+        ),
+        (
+            "admins",
+            "jj.himenez",
+            "Jose Himenez",
+            "jj.himenez@school.edu",
+            "ChangeMe123!",
+            "Computer Laboratory",
+            "Active",
+        ),
+    ]
+
+    for table_name, username, name, email, password_value, facility_or_title, status in default_rows:
+        if table_name == "super_admins":
+            existing = conn.execute("SELECT id FROM super_admins WHERE username = ?", (username,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE super_admins SET fullname = ?, email = ?, password = ?, title = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO super_admins (email, fullname, username, password, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (email, name, username, password_value, facility_or_title, status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
+                )
+        else:
+            existing = conn.execute("SELECT id FROM admins WHERE username = ?", (username,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE admins SET name = ?, email = ?, password = ?, facilities = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO admins (name, email, username, password, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (name, email, username, password_value, facility_or_title, status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
+                )
+
+    conn.commit()
+    conn.close()
+
+
 def sql_literal(value: str) -> str:
     return str(value).replace("'", "''")
 
@@ -149,6 +237,23 @@ def run_d1_sql(command: str):
     if result.returncode != 0:
         raise RuntimeError(result.stderr or result.stdout or "D1 command failed")
     return result.stdout.strip()
+
+
+def sync_local_db_to_d1() -> None:
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sync_script = os.path.join(project_root, "scripts", "sync_cloudflare_d1.py")
+    if not os.path.exists(sync_script):
+        return
+
+    result = subprocess.run(
+        [sys.executable, sync_script],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        shell=False,
+    )
+    if result.returncode != 0:
+        print(f"[cloudflare-sync] {result.stderr.strip() or result.stdout.strip()}")
 
 
 def persist_admin_to_d1(payload: AdminCreateRequest):
@@ -261,6 +366,7 @@ def create_admin(payload: AdminCreateRequest):
 
         created = create_local_admin(payload)
         persist_admin_to_d1(payload)
+        sync_local_db_to_d1()
         return created
     except HTTPException:
         raise
@@ -273,6 +379,7 @@ def delete_admin(admin_id: int):
     try:
         result = delete_local_admin(admin_id)
         delete_admin_from_d1(admin_id)
+        sync_local_db_to_d1()
         return result
     except HTTPException:
         raise
@@ -319,6 +426,7 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
     conn.commit()
     updated = conn.execute("SELECT id, name, email, username, facilities, status FROM admins WHERE id = ?", (admin_id,)).fetchone()
     conn.close()
+    sync_local_db_to_d1()
     return {
         "id": updated[0],
         "name": updated[1],
@@ -332,6 +440,7 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
 @app.post("/login")
 def login(payload: LoginRequest):
     try:
+        seed_default_accounts()
         d1_db_path = find_d1_database_path()
 
         if d1_db_path and os.path.exists(d1_db_path):
@@ -370,13 +479,30 @@ def login(payload: LoginRequest):
             conn.close()
 
         ensure_local_admin_table()
+        ensure_local_super_admin_table()
         conn = sqlite3.connect(LOCAL_DB_PATH)
+
         local_super_row = conn.execute(
-            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? LIMIT 1",
+            "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? LIMIT 1",
             (payload.username,),
         ).fetchone()
         if local_super_row:
-            db_id, db_name, db_username, db_password, db_facilities, db_status = local_super_row
+            db_id, db_name, db_username, db_password, db_status = local_super_row
+            if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+                conn.close()
+                return LoginResponse(
+                    id=str(db_id),
+                    name=db_name,
+                    username=db_username,
+                    role="superadmin",
+                ).model_dump()
+
+        local_admin_row = conn.execute(
+            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? LIMIT 1",
+            (payload.username,),
+        ).fetchone()
+        if local_admin_row:
+            db_id, db_name, db_username, db_password, db_facilities, db_status = local_admin_row
             if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
                 conn.close()
                 return LoginResponse(
