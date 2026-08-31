@@ -1,0 +1,10 @@
+{
+  "description": "Manage room and facility reservations effortlessly with role-based dashboards for superadmins and admins, ensuring efficient scheduling and oversight.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

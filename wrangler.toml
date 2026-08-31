@@ -1,0 +1,7 @@
+name = "facilitrack"
+compatibility_date = "2026-08-31"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "facilitrack-db"
+database_id = "9180567f-aff5-48f0-beb0-c3c21ee67e1b"

@@ -1,0 +1,58 @@
+
+<div style="display: flex; min-height: 600px; background: #f8fafa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <!-- Left half - gradient background -->
+  <div style="flex: 1; background: linear-gradient(135deg, #1B4D3E 0%, #2D7A4F 100%); display: flex; align-items: center; justify-content: center; padding: 40px;">
+    <div style="text-align: center;">
+      <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="stroke: white; stroke-width: 2; stroke-linecap: round;">
+          <circle cx="24" cy="24" r="16"></circle>
+          <path d="M24 16v16M16 24h16"></path>
+        </svg>
+      </div>
+      <h1 style="color: white; font-size: 32px; font-weight: 500; margin: 0 0 8px;">FaciliTrack</h1>
+      <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0;">Real-Time Facility Reservation</p>
+    </div>
+  </div>
+
+  <!-- Right half - login form -->
+  <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px;">
+    <div style="width: 100%; max-width: 340px;">
+      <h2 style="font-size: 24px; font-weight: 500; color: #1B4D3E; margin: 0 0 24px; text-align: center;">Sign In</h2>
+      
+      <form style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Username field -->
+        <div>
+          <label style="display: block; font-size: 13px; font-weight: 500; color: #2C3E50; margin-bottom: 6px;">Username</label>
+          <input type="text" placeholder="Enter your username" style="width: 100%; padding: 10px 12px; border: 0.5px solid #e0e0e0; border-radius: 6px; font-size: 14px; box-sizing: border-box; background: white;">
+        </div>
+
+        <!-- Password field -->
+        <div>
+          <label style="display: block; font-size: 13px; font-weight: 500; color: #2C3E50; margin-bottom: 6px;">Password</label>
+          <div style="display: flex; align-items: center; gap: 8px; border: 0.5px solid #e0e0e0; border-radius: 6px; padding: 0 12px; background: white;">
+            <input type="password" id="pwd" placeholder="Enter your password" style="flex: 1; padding: 10px 0; border: none; font-size: 14px; outline: none; background: transparent;">
+            <button type="button" onclick="const el = document.getElementById('pwd'); el.type = el.type === 'password' ? 'text' : 'password';" style="background: none; border: none; cursor: pointer; padding: 4px; color: #7F8C8D;">
+              <i class="ti ti-eye" style="font-size: 18px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Show password checkbox -->
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #7F8C8D; cursor: pointer;">
+          <input type="checkbox" style="width: 16px; height: 16px; cursor: pointer;">
+          Show password
+        </label>
+
+        <!-- Login button -->
+        <button type="submit" style="background: #2D7A4F; color: white; padding: 12px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 8px; transition: background 0.2s;">
+          Sign In
+        </button>
+
+        <!-- Forgot password link -->
+        <div style="text-align: right; margin-top: 4px;">
+          <a href="#" style="font-size: 13px; color: #2D7A4F; text-decoration: none; cursor: pointer;">Forgot password?</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
