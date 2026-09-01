@@ -129,7 +129,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
   useEffect(() => {
     const loadAdmins = async () => {
       try {
-        const response = await fetch("http://localhost:8000/admins");
+        const response = await fetch("http://localhost:8443/admins");
         if (!response.ok) return;
         const data = await response.json();
         if (Array.isArray(data) && data.length) {
@@ -169,7 +169,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
 
     try {
       const isUpdate = !!a.id && admins.some((admin) => admin.id === a.id);
-      const response = await fetch(`http://localhost:8000/admins${isUpdate ? `/${a.id}` : ""}`, {
+      const response = await fetch(`http://localhost:8443/admins${isUpdate ? `/${a.id}` : ""}`, {
         method: isUpdate ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -321,7 +321,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
               </button>
               <button onClick={async () => {
                 try {
-                  const response = await fetch(`http://localhost:8000/admins/${deleteId}`, { method: "DELETE" });
+                  const response = await fetch(`http://localhost:8443/admins/${deleteId}`, { method: "DELETE" });
                   if (response.ok) {
                     setAdmins((p) => p.filter((a) => a.id !== deleteId));
                     addToast?.("Admin deleted successfully.", "success");

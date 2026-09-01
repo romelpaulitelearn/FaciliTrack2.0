@@ -6,7 +6,7 @@ import type { User } from "../types";
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SEQUENCE = [30, 60, 180, 300, 900, 1800, 3600, 43200, 86400];
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8443")).replace(/\/$/, "");
 
 const formatDuration = (seconds: number) => {
   if (seconds < 60) return `${seconds} seconds`;
@@ -27,16 +27,21 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
   const [countdown, setCountdown] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const resetLockoutState = () => {
+    setAttempts(0);
+    setLockoutStage(0);
+    setLockedUntil(null);
+    setCountdown(0);
+    setError("");
+  };
+
   // Countdown tick
   useEffect(() => {
     if (!lockedUntil) return;
     const tick = () => {
       const remaining = Math.ceil((lockedUntil - Date.now()) / 1000);
       if (remaining <= 0) {
-        setLockedUntil(null);
-        setAttempts(0);
-        setCountdown(0);
-        setError("");
+        resetLockoutState();
         if (timerRef.current) clearInterval(timerRef.current);
       } else {
         setCountdown(remaining);
@@ -76,8 +81,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
           role: data.role,
           facility: data.facility,
         };
-        setAttempts(0);
-        setLockoutStage(0);
+        resetLockoutState();
         onLogin(user);
       } else {
         const next = attempts + 1;
