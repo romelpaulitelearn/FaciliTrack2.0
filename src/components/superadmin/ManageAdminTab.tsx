@@ -3,7 +3,8 @@ import { Search, Plus, Eye, EyeOff, Edit2, Trash2, X } from "lucide-react";
 import type { Admin } from "../../types";
 import { MOCK_ADMINS } from "../../data";
 
-const FACILITIES = ["Computer Laboratory", "Science & Physics Lab", "Tertiary Classroom", "Hotel Restaurant Management", "Gymnasium"];
+const FACILITIES = ["All Facilities", "Computer Laboratory", "Science & Physics Lab", "Tertiary Classroom", "Hotel Restaurant Management", "Gymnasium"];
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8443")).replace(/\/$/, "");
 
 function PasswordStrength({ password }: { password: string }) {
   const strength = !password ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 4 : 3;
@@ -43,7 +44,7 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#7F8C8D", padding: 2, display: "flex" }}><X size={16} /></button>
         </div>
         <form
-          onSubmit={(e) => { e.preventDefault(); onSave({ ...form, id: admin?.id ?? String(Date.now()) }); }}
+          onSubmit={(e) => { e.preventDefault(); if (form.facilities.length) onSave({ ...form, id: admin?.id ?? String(Date.now()) }); }}
           style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}
         >
           {[
@@ -86,6 +87,7 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
                 </button>
               ))}
             </div>
+            {!form.facilities.length && <p style={{ margin: "6px 0 0", fontSize: 11, color: "#E74C3C" }}>Assign at least one facility.</p>}
           </div>
 
           <div>
@@ -109,7 +111,8 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
               Cancel
             </button>
             <button type="submit"
-              style={{ flex: 1, padding: "10px", borderRadius: 6, fontSize: 13, fontWeight: 500, background: "#2D7A4F", color: "white", border: "none", cursor: "pointer" }}>
+              disabled={!form.facilities.length}
+              style={{ flex: 1, padding: "10px", borderRadius: 6, fontSize: 13, fontWeight: 500, background: form.facilities.length ? "#2D7A4F" : "#b7c7bd", color: "white", border: "none", cursor: form.facilities.length ? "pointer" : "not-allowed" }}>
               Save
             </button>
           </div>
@@ -129,7 +132,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
   useEffect(() => {
     const loadAdmins = async () => {
       try {
-        const response = await fetch("http://localhost:8443/admins");
+        const response = await fetch(`${API_BASE_URL}/admins`);
         if (!response.ok) return;
         const data = await response.json();
         if (Array.isArray(data) && data.length) {
@@ -162,14 +165,14 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
       name: a.name,
       email: a.email,
       username: a.username,
-      password: a.password,
+      ...(a.password ? { password: a.password } : {}),
       facilities: a.facilities,
       status: a.status,
     };
 
     try {
       const isUpdate = !!a.id && admins.some((admin) => admin.id === a.id);
-      const response = await fetch(`http://localhost:8443/admins${isUpdate ? `/${a.id}` : ""}`, {
+      const response = await fetch(`${API_BASE_URL}/admins${isUpdate ? `/${a.id}` : ""}`, {
         method: isUpdate ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -191,12 +194,12 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
           : [normalized, ...prev]);
         addToast?.(isUpdate ? "Admin updated successfully." : "Admin created successfully.", "success");
       } else {
-        setAdmins((prev) => prev.find((x) => x.id === a.id) ? prev.map((x) => x.id === a.id ? a : x) : [a, ...prev]);
         addToast?.(isUpdate ? "Failed to update admin." : "Failed to create admin.", "error");
+        return;
       }
     } catch {
-      setAdmins((prev) => prev.find((x) => x.id === a.id) ? prev.map((x) => x.id === a.id ? a : x) : [a, ...prev]);
       addToast?.("Unable to save admin. Please try again.", "error");
+      return;
     }
 
     setModal(null);
@@ -321,7 +324,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
               </button>
               <button onClick={async () => {
                 try {
-                  const response = await fetch(`http://localhost:8443/admins/${deleteId}`, { method: "DELETE" });
+                  const response = await fetch(`${API_BASE_URL}/admins/${deleteId}`, { method: "DELETE" });
                   if (response.ok) {
                     setAdmins((p) => p.filter((a) => a.id !== deleteId));
                     addToast?.("Admin deleted successfully.", "success");
@@ -329,7 +332,6 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
                     addToast?.("Failed to delete admin.", "error");
                   }
                 } catch {
-                  setAdmins((p) => p.filter((a) => a.id !== deleteId));
                   addToast?.("Unable to delete admin. Please try again.", "error");
                 }
                 setDeleteId(null);

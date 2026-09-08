@@ -1,4 +1,4 @@
-export type UserRole = "superadmin" | "admin";
+export type UserRole = "superadmin" | "admin" | "requester";
 
 export interface User {
   id?: string;
@@ -6,10 +6,12 @@ export interface User {
   username: string;
   role: UserRole;
   facility?: string;
+  facilities?: string[];
 }
 
 export type SuperadminTab = "dashboard" | "manage-admin" | "settings";
 export type AdminTab = "dashboard" | "facilities" | "reservations" | "settings";
+export type RequesterTab = "reservations" | "settings";
 
 export interface Admin {
   id: string;
