@@ -25,6 +25,11 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
   const [lockoutStage, setLockoutStage] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotUsername, setForgotUsername] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const resetLockoutState = () => {
@@ -55,6 +60,31 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
   const isLocked = lockedUntil !== null && Date.now() < lockedUntil;
   const mm = String(Math.floor(countdown / 60)).padStart(2, "0");
   const ss = String(countdown % 60).padStart(2, "0");
+
+  const handleForgotPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setForgotLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: forgotUsername, email: forgotEmail, newPassword: forgotPassword }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Unable to reset password.");
+      }
+      setForgotOpen(false);
+      setForgotUsername("");
+      setForgotEmail("");
+      setForgotPassword("");
+      setError("Password reset successfully. You can now sign in.");
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Unable to reset password.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,7 +194,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
                 </p>
                 <p style={{ margin: 0, fontSize: 11, color: "#7F8C8D" }}>
                   Forgot your password?{" "}
-                  <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#2D7A4F", textDecoration: "none", fontWeight: 500 }}>
+                    <a href="#forgot-password" onClick={(e) => { e.preventDefault(); setForgotOpen(true); }} style={{ color: "#2D7A4F", textDecoration: "none", fontWeight: 500 }}>
                     Reset it here
                   </a>
                 </p>
@@ -181,7 +211,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
                 {attempts >= 2 && (
                   <p style={{ margin: "4px 0 0", fontSize: 11, color: "#7F8C8D" }}>
                     2 attempts reached — consider using the forgot password option.{" "}
-                    <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#2D7A4F", textDecoration: "none" }}>Forgot password?</a>
+                    <a href="#forgot-password" onClick={(e) => { e.preventDefault(); setForgotOpen(true); }} style={{ color: "#2D7A4F", textDecoration: "none" }}>Forgot password?</a>
                   </p>
                 )}
               </div>
@@ -218,7 +248,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
             </label>
 
             <div style={{ textAlign: "right" }}>
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 13, color: "#2D7A4F", textDecoration: "none" }}>Forgot password?</a>
+              <a href="#forgot-password" onClick={(e) => { e.preventDefault(); setForgotOpen(true); }} style={{ fontSize: 13, color: "#2D7A4F", textDecoration: "none" }}>Forgot password?</a>
             </div>
 
             <button type="submit" disabled={loading || isLocked}
@@ -227,9 +257,26 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
             </button>
           </form>
 
-          <p style={{ marginTop: 20, textAlign: "center", fontSize: 11, color: "#B0BEC5" }}>
-            Demo: <strong style={{ color: "#2D7A4F" }}>requester1</strong> / Requester123! to reserve, <strong style={{ color: "#2D7A4F" }}>admin1</strong> / ChangeMe123! to approve.
-          </p>
+          {forgotOpen && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.35)" }}>
+              <form onSubmit={handleForgotPassword} style={{ width: "100%", maxWidth: 360, padding: 24, borderRadius: 10, background: "white", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+                <h3 style={{ margin: "0 0 6px", color: "#1B4D3E", fontSize: 17 }}>Reset Password</h3>
+                <p style={{ margin: "0 0 18px", color: "#7F8C8D", fontSize: 12 }}>Enter your username and registered email.</p>
+                {[ ["Username", forgotUsername, setForgotUsername, "text"], ["Registered email", forgotEmail, setForgotEmail, "email"], ["New password", forgotPassword, setForgotPassword, "password"] ].map(([label, value, setter, type]) => (
+                  <label key={label as string} style={{ display: "block", marginBottom: 12, color: "#2C3E50", fontSize: 12 }}>
+                    {label}
+                    <input type={type as string} value={value as string} onChange={(event) => (setter as (value: string) => void)(event.target.value)} required minLength={type === "password" ? 6 : undefined}
+                      style={{ width: "100%", boxSizing: "border-box", marginTop: 6, padding: "10px 12px", border: "0.5px solid #d8e0dc", borderRadius: 6, fontSize: 13 }} />
+                  </label>
+                ))}
+                <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                  <button type="button" onClick={() => setForgotOpen(false)} style={{ flex: 1, padding: 10, border: "0.5px solid #e0e0e0", borderRadius: 6, background: "white", color: "#7F8C8D" }}>Cancel</button>
+                  <button type="submit" disabled={forgotLoading} style={{ flex: 1, padding: 10, border: "none", borderRadius: 6, background: "#2D7A4F", color: "white" }}>{forgotLoading ? "Resetting..." : "Reset Password"}</button>
+                </div>
+              </form>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

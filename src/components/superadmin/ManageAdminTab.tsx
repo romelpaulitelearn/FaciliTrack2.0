@@ -67,7 +67,7 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#2C3E50", marginBottom: 5 }}>Password</label>
             <div style={{ display: "flex", alignItems: "center", border: "0.5px solid #e0e0e0", borderRadius: 6, padding: "0 12px", background: "white" }}>
-              <input type={showPass ? "text" : "password"} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder="••••••••" required
+              <input type={showPass ? "text" : "password"} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} placeholder={admin ? "Leave blank to keep current password" : "••••••••"} required={!admin}
                 style={{ flex: 1, padding: "9px 0", border: "none", fontSize: 13, outline: "none", background: "transparent" }} />
               <button type="button" onClick={() => setShowPass(!showPass)} style={{ background: "none", border: "none", cursor: "pointer", color: "#7F8C8D", display: "flex" }}>
                 {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -123,7 +123,7 @@ function AdminModal({ admin, onSave, onClose }: { admin?: Admin; onSave: (a: Adm
 }
 
 export default function ManageAdminTab({ addToast }: { addToast?: (message: string, type?: "success" | "error" | "info") => void }) {
-  const [admins, setAdmins] = useState<Admin[]>(MOCK_ADMINS);
+  const [admins, setAdmins] = useState<Admin[]>([]);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
   const [editing, setEditing] = useState<Admin | undefined>();
@@ -135,7 +135,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
         const response = await fetch(`${API_BASE_URL}/admins`);
         if (!response.ok) return;
         const data = await response.json();
-        if (Array.isArray(data) && data.length) {
+        if (Array.isArray(data)) {
           const mapped = data.map((item: any) => ({
             id: String(item.id),
             name: item.name,
@@ -148,7 +148,7 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
           setAdmins(mapped);
         }
       } catch {
-        // fallback to mock data when backend is unavailable
+        addToast?.("Unable to load administrators. Please try again.", "error");
       }
     };
 
@@ -194,7 +194,8 @@ export default function ManageAdminTab({ addToast }: { addToast?: (message: stri
           : [normalized, ...prev]);
         addToast?.(isUpdate ? "Admin updated successfully." : "Admin created successfully.", "success");
       } else {
-        addToast?.(isUpdate ? "Failed to update admin." : "Failed to create admin.", "error");
+        const data = await response.json().catch(() => ({}));
+        addToast?.(data.detail || (isUpdate ? "Failed to update admin." : "Failed to create admin."), "error");
         return;
       }
     } catch {

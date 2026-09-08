@@ -51,6 +51,18 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class ForgotPasswordRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=3)
+    newPassword: str = Field(..., min_length=6)
+
+
+class ChangePasswordRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    currentPassword: str = Field(..., min_length=1)
+    newPassword: str = Field(..., min_length=6)
+
+
 class LoginResponse(BaseModel):
     id: str
     name: str
@@ -306,7 +318,7 @@ def seed_default_accounts() -> None:
         (
             "requesters",
             "requester1",
-            "Facility Requester",
+            "Student",
             "requester1@school.edu",
             "Requester123!",
             "",
@@ -319,8 +331,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM super_admins WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE super_admins SET fullname = ?, email = ?, password = ?, title = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE super_admins SET fullname = ?, email = ?, title = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, facility_or_title, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -331,8 +343,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM admins WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE admins SET name = ?, email = ?, password = ?, facilities = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE admins SET name = ?, email = ?, facilities = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, facility_or_title, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -343,8 +355,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM requesters WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE requesters SET name = ?, email = ?, password = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, password_value, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE requesters SET name = ?, email = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -596,7 +608,10 @@ def create_admin(payload: AdminCreateRequest):
             persist_admin_to_d1(payload)
         except Exception as exc:
             print(f"[cloudflare-sync] admin create skipped: {exc}")
-        sync_local_db_to_d1()
+        try:
+            sync_local_db_to_d1()
+        except Exception as exc:
+            print(f"[cloudflare-sync] full sync skipped: {exc}")
         return created
     except HTTPException:
         raise
@@ -785,6 +800,57 @@ def login(payload: LoginRequest):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest):
+    seed_default_accounts()
+    username = payload.username.strip().casefold()
+    email = payload.email.strip().casefold()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    account = None
+    for table_name, name_column in (("super_admins", "fullname"), ("admins", "name"), ("requesters", "name")):
+        account = conn.execute(
+            f"SELECT id, email FROM {table_name} WHERE username = ? COLLATE NOCASE LIMIT 1",
+            (username,),
+        ).fetchone()
+        if account:
+            if str(account[1] or "").strip().casefold() != email:
+                conn.close()
+                raise HTTPException(status_code=400, detail="Username and email do not match.")
+            conn.execute(
+                f"UPDATE {table_name} SET password = ?, updated_at = ? WHERE id = ?",
+                (payload.newPassword, datetime.utcnow().isoformat(), account[0]),
+            )
+            conn.commit()
+            conn.close()
+            return {"message": "Password reset successfully."}
+    conn.close()
+    raise HTTPException(status_code=404, detail="Account not found.")
+
+
+@app.post("/change-password")
+def change_password(payload: ChangePasswordRequest):
+    username = payload.username.strip().casefold()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    for table_name in ("super_admins", "admins", "requesters"):
+        row = conn.execute(
+            f"SELECT id, password FROM {table_name} WHERE username = ? COLLATE NOCASE LIMIT 1",
+            (username,),
+        ).fetchone()
+        if row:
+            if not password_matches(row[1], payload.currentPassword):
+                conn.close()
+                raise HTTPException(status_code=400, detail="Current password is incorrect.")
+            conn.execute(
+                f"UPDATE {table_name} SET password = ?, updated_at = ? WHERE id = ?",
+                (payload.newPassword, datetime.utcnow().isoformat(), row[0]),
+            )
+            conn.commit()
+            conn.close()
+            return {"message": "Password updated successfully."}
+    conn.close()
+    raise HTTPException(status_code=404, detail="Account not found.")
 
 
 @app.get("/facilities/{facility_name}/rooms")

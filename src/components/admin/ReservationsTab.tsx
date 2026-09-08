@@ -28,6 +28,9 @@ const emptyForm = (user: User): ReservationForm => ({
   totalStudents: 1,
 });
 
+const DEFAULT_START_TIME = "08:00";
+const DEFAULT_END_TIME = "11:00";
+
 function DeclineModal({ onConfirm, onCancel }: { onConfirm: (r: string) => void; onCancel: () => void }) {
   const [reason, setReason] = useState("");
   return (
@@ -62,6 +65,8 @@ export default function ReservationsTab({ user, addToast, onRoomBook }: Props) {
   const requestsRef = useRef<ReservationRequest[]>([]);
   const hasLoadedRequests = useRef(false);
   const [form, setForm] = useState<ReservationForm>(() => emptyForm(user));
+  const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
+  const [endTime, setEndTime] = useState(DEFAULT_END_TIME);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [declineTarget, setDeclineTarget] = useState<string | null>(null);
 
@@ -116,8 +121,14 @@ export default function ReservationsTab({ user, addToast, onRoomBook }: Props) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (startTime >= endTime) {
+      addToast("The end time must be later than the start time.", "error");
+      return;
+    }
+    const timeNeeded = `${startTime} - ${endTime}`;
     const request: ReservationRequest = {
       ...form,
+      timeNeeded,
       id: `reservation-${Date.now()}`,
       dateFiled: new Date().toLocaleDateString("en-US"),
       status: "Pending",
@@ -126,7 +137,7 @@ export default function ReservationsTab({ user, addToast, onRoomBook }: Props) {
       const response = await fetch(`${API_BASE_URL}/reservations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, timeNeeded }),
       });
       if (!response.ok) throw new Error("Reservation API unavailable");
       const savedRequest: ReservationRequest = await response.json();
@@ -136,6 +147,8 @@ export default function ReservationsTab({ user, addToast, onRoomBook }: Props) {
       return;
     }
     setForm(emptyForm(user));
+    setStartTime(DEFAULT_START_TIME);
+    setEndTime(DEFAULT_END_TIME);
     addToast("Reservation request submitted. It is now visible to the admin.", "success");
   };
 
@@ -220,9 +233,13 @@ export default function ReservationsTab({ user, addToast, onRoomBook }: Props) {
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#2C3E50" }}>
             Time Needed
-            <select value={form.timeNeeded} onChange={(event) => updateForm("timeNeeded", event.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", border: "0.5px solid #d8e0dc", borderRadius: 6, fontSize: 13, background: "white" }}>
-              {TIME_SLOTS.map((slot) => <option key={slot}>{slot}</option>)}
-            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} required
+                style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "10px 8px", border: "0.5px solid #d8e0dc", borderRadius: 6, fontSize: 13 }} />
+              <span style={{ color: "#7F8C8D" }}>to</span>
+              <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} required
+                style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "10px 8px", border: "0.5px solid #d8e0dc", borderRadius: 6, fontSize: 13 }} />
+            </div>
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#2C3E50" }}>
             Total Students
