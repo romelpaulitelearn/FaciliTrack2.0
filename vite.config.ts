@@ -50,6 +50,10 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:8000',
           changeOrigin: true,
         },
+        '/requesters': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
         '/reservations': {
           target: 'http://localhost:8000',
           changeOrigin: true,

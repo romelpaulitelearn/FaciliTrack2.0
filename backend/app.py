@@ -46,6 +46,22 @@ class AdminUpdateRequest(BaseModel):
     status: Optional[Literal["Active", "Inactive"]] = None
 
 
+class RequesterCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=6)
+    status: Literal["Active", "Inactive"] = "Active"
+
+
+class RequesterUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    status: Optional[Literal["Active", "Inactive"]] = None
+
+
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
@@ -470,6 +486,32 @@ def delete_local_admin(admin_id: int):
     return {"success": True, "deleted_id": admin_id}
 
 
+def create_local_requester(payload: RequesterCreateRequest):
+    ensure_local_requester_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    conn.execute(
+        "INSERT INTO requesters (name, email, username, password, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (payload.name, payload.email.strip(), payload.username, payload.password, payload.status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    requester_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    row = conn.execute("SELECT id, name, email, username, status FROM requesters WHERE id = ?", (requester_id,)).fetchone()
+    conn.close()
+    return {"id": row[0], "name": row[1], "email": row[2], "username": row[3], "status": row[4]}
+
+
+def delete_local_requester(requester_id: int):
+    ensure_local_requester_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    if not conn.execute("SELECT id FROM requesters WHERE id = ?", (requester_id,)).fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+    conn.execute("DELETE FROM requesters WHERE id = ?", (requester_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted_id": requester_id}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "database_name": DB_NAME}
@@ -588,6 +630,58 @@ def list_admins():
         }
         for row in rows
     ]
+
+
+@app.get("/requesters")
+def list_requesters():
+    ensure_local_requester_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    rows = conn.execute("SELECT id, name, email, username, status FROM requesters ORDER BY id DESC").fetchall()
+    conn.close()
+    return [{"id": row[0], "name": row[1], "email": row[2] or f"{row[3]}@school.edu", "username": row[3], "status": row[4]} for row in rows]
+
+
+@app.post("/requesters")
+def create_requester(payload: RequesterCreateRequest):
+    ensure_local_requester_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    existing = conn.execute("SELECT id FROM requesters WHERE username = ?", (payload.username,)).fetchone()
+    conn.close()
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already exists.")
+    return create_local_requester(payload)
+
+
+@app.delete("/requesters/{requester_id}")
+def delete_requester(requester_id: int):
+    return delete_local_requester(requester_id)
+
+
+@app.put("/requesters/{requester_id}")
+def update_requester(requester_id: int, payload: RequesterUpdateRequest):
+    ensure_local_requester_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    if not conn.execute("SELECT id FROM requesters WHERE id = ?", (requester_id,)).fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+    updates, values = [], []
+    for field in ("name", "email", "username", "password", "status"):
+        value = getattr(payload, field)
+        if value is not None:
+            if field == "username" and conn.execute("SELECT id FROM requesters WHERE username = ? AND id != ?", (value.strip(), requester_id)).fetchone():
+                conn.close()
+                raise HTTPException(status_code=409, detail="Username already exists.")
+            updates.append(f"{field} = ?")
+            values.append(value.strip() if isinstance(value, str) else value)
+    if not updates:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No fields to update.")
+    values.extend([datetime.utcnow().isoformat(), requester_id])
+    conn.execute(f"UPDATE requesters SET {', '.join(updates)}, updated_at = ? WHERE id = ?", values)
+    conn.commit()
+    row = conn.execute("SELECT id, name, email, username, status FROM requesters WHERE id = ?", (requester_id,)).fetchone()
+    conn.close()
+    return {"id": row[0], "name": row[1], "email": row[2] or f"{row[3]}@school.edu", "username": row[3], "status": row[4]}
 
 
 @app.post("/admins")

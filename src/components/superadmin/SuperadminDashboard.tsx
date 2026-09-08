@@ -3,6 +3,7 @@ import { LayoutDashboard, Users, Settings, LogOut } from "lucide-react";
 import TopNav from "../TopNav";
 import OverviewTab from "./OverviewTab";
 import ManageAdminTab from "./ManageAdminTab";
+import ManageUsersTab from "./ManageUsersTab";
 import SettingsTab from "../SettingsTab";
 import type { User, SuperadminTab, Toast } from "../../types";
 import ToastContainer from "../Toast";
@@ -18,6 +19,7 @@ export default function SuperadminDashboard({ user, onLogout }: { user: User; on
   const navItems = [
     { label: "Dashboard", icon: <LayoutDashboard size={16} />, id: "dashboard" },
     { label: "Manage Admin", icon: <Users size={16} />, id: "manage-admin" },
+    { label: "Manage Users", icon: <Users size={16} />, id: "manage-users" },
     { label: "Settings", icon: <Settings size={16} />, id: "settings" },
     { label: "Logout", icon: <LogOut size={16} />, id: "logout" },
   ];
@@ -34,6 +36,7 @@ export default function SuperadminDashboard({ user, onLogout }: { user: User; on
       <main style={{ flex: 1, overflowY: "auto" }}>
         {activeTab === "dashboard" && <OverviewTab />}
         {activeTab === "manage-admin" && <ManageAdminTab addToast={addToast} />}
+        {activeTab === "manage-users" && <ManageUsersTab addToast={addToast} />}
         {activeTab === "settings" && <SettingsTab user={user} addToast={addToast} />}
       </main>
       <ToastContainer toasts={toasts} onRemove={removeToast} />

@@ -23,6 +23,15 @@ export interface Admin {
   status: "Active" | "Inactive";
 }
 
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  status: "Active" | "Inactive";
+}
+
 export type FacilityAdminAssignment =
   | "Computer Laboratory"
   | "Science & Physics Lab"
