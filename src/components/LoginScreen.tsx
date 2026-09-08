@@ -115,34 +115,26 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
         resetLockoutState();
         onLogin(user);
       } else {
-        const next = attempts + 1;
-        const shouldLock = next >= MAX_ATTEMPTS || lockoutStage > 0;
-        setAttempts(next);
-
-        if (shouldLock) {
-          const duration = LOCKOUT_SEQUENCE[Math.min(lockoutStage, LOCKOUT_SEQUENCE.length - 1)];
-          setLockedUntil(Date.now() + duration * 1000);
-          setLockoutStage((prev) => Math.min(prev + 1, LOCKOUT_SEQUENCE.length - 1));
-          setAttempts(0);
-          setError(`Too many failed attempts. Account locked for ${formatDuration(duration)}.`);
+        if (response.status >= 500) {
+          setError("The login service is unavailable. Please try again shortly.");
         } else {
-          setError(`Invalid username or password. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? "" : "s"} remaining.`);
+          const next = attempts + 1;
+          const shouldLock = next >= MAX_ATTEMPTS || lockoutStage > 0;
+          setAttempts(next);
+
+          if (shouldLock) {
+            const duration = LOCKOUT_SEQUENCE[Math.min(lockoutStage, LOCKOUT_SEQUENCE.length - 1)];
+            setLockedUntil(Date.now() + duration * 1000);
+            setLockoutStage((prev) => Math.min(prev + 1, LOCKOUT_SEQUENCE.length - 1));
+            setAttempts(0);
+            setError(`Too many failed attempts. Account locked for ${formatDuration(duration)}.`);
+          } else {
+            setError(`Invalid username or password. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? "" : "s"} remaining.`);
+          }
         }
       }
     } catch {
-      const next = attempts + 1;
-      const shouldLock = next >= MAX_ATTEMPTS || lockoutStage > 0;
-      setAttempts(next);
-
-      if (shouldLock) {
-        const duration = LOCKOUT_SEQUENCE[Math.min(lockoutStage, LOCKOUT_SEQUENCE.length - 1)];
-        setLockedUntil(Date.now() + duration * 1000);
-        setLockoutStage((prev) => Math.min(prev + 1, LOCKOUT_SEQUENCE.length - 1));
-        setAttempts(0);
-        setError(`Too many failed attempts. Account locked for ${formatDuration(duration)}.`);
-      } else {
-        setError(`Connection error. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? "" : "s"} remaining.`);
-      }
+      setError("Unable to reach the login service. Please try again shortly.");
     } finally {
       setLoading(false);
     }
