@@ -331,8 +331,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM super_admins WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE super_admins SET fullname = ?, email = ?, title = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE super_admins SET fullname = ?, email = ?, password = ?, title = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -343,8 +343,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM admins WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE admins SET name = ?, email = ?, facilities = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, facility_or_title, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE admins SET name = ?, email = ?, password = ?, facilities = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, facility_or_title, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -355,8 +355,8 @@ def seed_default_accounts() -> None:
             existing = conn.execute("SELECT id FROM requesters WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE requesters SET name = ?, email = ?, status = ?, updated_at = ? WHERE username = ?",
-                    (name, email, status, datetime.utcnow().isoformat(), username),
+                    "UPDATE requesters SET name = ?, email = ?, password = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, status, datetime.utcnow().isoformat(), username),
                 )
             else:
                 conn.execute(
@@ -538,7 +538,7 @@ def create_reservation(payload: ReservationCreateRequest):
             now,
         ),
     )
-     # after conn.commit()
+    conn.commit()
     row = conn.execute(
         "SELECT id, email, phone, date_filed, date_needed, time_needed, facility, accountability_name, department, grade_course_year, subject, total_students, status FROM reservations WHERE id = ?",
         (cursor.lastrowid,),
