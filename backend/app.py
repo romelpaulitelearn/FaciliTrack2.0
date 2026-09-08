@@ -703,59 +703,39 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
 @app.post("/login")
 def login(payload: LoginRequest):
     try:
+        # Make sure the local database and default accounts exist
         seed_default_accounts()
+
         username = payload.username.strip().casefold()
-        d1_db_path = find_d1_database_path()
 
-        if d1_db_path and os.path.exists(d1_db_path):
-            conn = sqlite3.connect(d1_db_path)
-
-            super_row = conn.execute(
-                "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? COLLATE NOCASE LIMIT 1",
-                (username,),
-            ).fetchone()
-            if super_row:
-                db_id, db_name, db_username, db_password, db_status = super_row
-                if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
-                    conn.close()
-                    return LoginResponse(
-                        id=str(db_id),
-                        name=db_name,
-                        username=db_username,
-                        role="superadmin",
-                    ).model_dump()
-
-            admin_row = conn.execute(
-                "SELECT id, fullname, username, password, facilities_assign, status FROM admins WHERE username = ? COLLATE NOCASE LIMIT 1",
-                (username,),
-            ).fetchone()
-            if admin_row:
-                db_id, db_name, db_username, db_password, db_facility, db_status = admin_row
-                if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
-                    assigned_facilities = expand_admin_facilities(db_facility)
-                    conn.close()
-                    return LoginResponse(
-                        id=str(db_id),
-                        name=db_name,
-                        username=db_username,
-                        role="admin",
-                        facility=assigned_facilities[0] if assigned_facilities else None,
-                        facilities=assigned_facilities,
-                    ).model_dump()
-            conn.close()
-
-        ensure_local_admin_table()
         ensure_local_super_admin_table()
+        ensure_local_admin_table()
+        ensure_local_requester_table()
+
         conn = sqlite3.connect(LOCAL_DB_PATH)
 
+        # =========================
+        # SUPER ADMIN LOGIN
+        # =========================
         local_super_row = conn.execute(
-            "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+            """
+            SELECT id, fullname, username, password, status
+            FROM super_admins
+            WHERE username = ? COLLATE NOCASE
+            LIMIT 1
+            """,
             (username,),
         ).fetchone()
+
         if local_super_row:
             db_id, db_name, db_username, db_password, db_status = local_super_row
-            if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+
+            if (
+                password_matches(db_password, payload.password)
+                and str(db_status or "").strip().lower() == "active"
+            ):
                 conn.close()
+
                 return LoginResponse(
                     id=str(db_id),
                     name=db_name,
@@ -763,44 +743,103 @@ def login(payload: LoginRequest):
                     role="superadmin",
                 ).model_dump()
 
+        # =========================
+        # ADMIN LOGIN
+        # =========================
         local_admin_row = conn.execute(
-            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+            """
+            SELECT id, name, username, password, facilities, status
+            FROM admins
+            WHERE username = ? COLLATE NOCASE
+            LIMIT 1
+            """,
             (username,),
         ).fetchone()
+
         if local_admin_row:
-            db_id, db_name, db_username, db_password, db_facilities, db_status = local_admin_row
-            if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+            (
+                db_id,
+                db_name,
+                db_username,
+                db_password,
+                db_facilities,
+                db_status,
+            ) = local_admin_row
+
+            if (
+                password_matches(db_password, payload.password)
+                and str(db_status or "").strip().lower() == "active"
+            ):
                 assigned_facilities = expand_admin_facilities(db_facilities)
+
                 conn.close()
+
                 return LoginResponse(
                     id=str(db_id),
                     name=db_name,
                     username=db_username,
                     role="admin",
-                    facility=assigned_facilities[0] if assigned_facilities else None,
+                    facility=(
+                        assigned_facilities[0]
+                        if assigned_facilities
+                        else None
+                    ),
                     facilities=assigned_facilities,
                 ).model_dump()
+
+        # =========================
+        # REQUESTER LOGIN
+        # =========================
         local_requester_row = conn.execute(
-            "SELECT id, name, username, password, status FROM requesters WHERE username = ? COLLATE NOCASE LIMIT 1",
+            """
+            SELECT id, name, username, password, status
+            FROM requesters
+            WHERE username = ? COLLATE NOCASE
+            LIMIT 1
+            """,
             (username,),
         ).fetchone()
+
         if local_requester_row:
-            db_id, db_name, db_username, db_password, db_status = local_requester_row
-            if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+            (
+                db_id,
+                db_name,
+                db_username,
+                db_password,
+                db_status,
+            ) = local_requester_row
+
+            if (
+                password_matches(db_password, payload.password)
+                and str(db_status or "").strip().lower() == "active"
+            ):
                 conn.close()
+
                 return LoginResponse(
                     id=str(db_id),
                     name=db_name,
                     username=db_username,
                     role="requester",
                 ).model_dump()
+
         conn.close()
 
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
+        # Account does not exist or password is incorrect
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password.",
+        )
+
     except HTTPException:
         raise
+
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        print(f"[LOGIN ERROR] {type(exc).__name__}: {exc}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        )
 
 
 @app.post("/forgot-password")
