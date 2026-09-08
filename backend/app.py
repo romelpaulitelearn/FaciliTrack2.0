@@ -406,7 +406,8 @@ def persist_admin_to_d1(payload: AdminCreateRequest):
     email = payload.email.strip() or f"{payload.username}@school.edu"
     insert_sql = (
         "INSERT INTO admins (email, fullname, username, password, facilities_assign, status) "
-        f"VALUES ('{sql_literal(email)}', '{sql_literal(payload.name)}', '{sql_literal(payload.username)}', '{sql_literal(payload.password)}', '{sql_literal(facility)}', '{sql_literal(payload.status)}');"
+        f"VALUES ('{sql_literal(email)}', '{sql_literal(payload.name)}', '{sql_literal(payload.username)}', "
+        f"'{sql_literal(payload.password)}', '{sql_literal(facility)}', '{sql_literal(payload.status)}');"
     )
     run_d1_sql(insert_sql)
 
@@ -537,7 +538,7 @@ def create_reservation(payload: ReservationCreateRequest):
             now,
         ),
     )
-    conn.commit()
+     # after conn.commit()
     row = conn.execute(
         "SELECT id, email, phone, date_filed, date_needed, time_needed, facility, accountability_name, department, grade_course_year, subject, total_students, status FROM reservations WHERE id = ?",
         (cursor.lastrowid,),
@@ -899,7 +900,7 @@ def get_facility_rooms(facility_name: str):
                 """
                 SELECT assigned_room, time_needed, department, grade_course_year, total_students
                 FROM reservations
-                WHERE facility = ? AND date_needed = ? AND status = 'approved'
+                WHERE facility = ? AND date_needed = ? AND status = 'Accepted'
                 ORDER BY time_needed
                 """,
                 (facility_name, today),
