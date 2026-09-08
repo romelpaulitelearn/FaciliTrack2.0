@@ -80,6 +80,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
           username: data.username,
           role: data.role,
           facility: data.facility,
+          facilities: data.facilities,
         };
         resetLockoutState();
         onLogin(user);
@@ -122,7 +123,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
 
       {/* ── Left panel ── */}
       <div className="hidden lg:flex"
-        style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60 }}>
+        style={{ flex: 1, position: "relative", overflow: "hidden", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60 }}>
         <img src={campusBg} alt="St. Paul University campus"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(0,84,0,0.8) 0%, rgba(223,181,0,0.8) 100%)" }} />
@@ -227,7 +228,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (user: User) => void
           </form>
 
           <p style={{ marginTop: 20, textAlign: "center", fontSize: 11, color: "#B0BEC5" }}>
-            Demo — try <strong style={{ color: "#2D7A4F" }}>superadmin</strong>, <strong style={{ color: "#2D7A4F" }}>admin1</strong>, or <strong style={{ color: "#2D7A4F" }}>admin5</strong>
+            Demo: <strong style={{ color: "#2D7A4F" }}>requester1</strong> / Requester123! to reserve, <strong style={{ color: "#2D7A4F" }}>admin1</strong> / ChangeMe123! to approve.
           </p>
         </div>
       </div>

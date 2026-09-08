@@ -8,7 +8,7 @@ interface SettingsTabProps {
 }
 
 const FAQ_ITEMS = [
-  { q: "How do I accept a reservation request?", a: "Go to Request Reservation tab, expand a pending request, then click Accept. The room will automatically be marked as Occupied." },
+  { q: "How do I approve a reservation request?", a: "Go to Request Reservation tab, expand a pending request, then click Approve. The room will automatically be marked as Occupied." },
   { q: "How do I update a room's status?", a: "Room status updates automatically when a reservation is accepted or declined. Manual overrides are available to the Superadmin." },
   { q: "What happens after 3 failed login attempts?", a: "The account is temporarily locked for 5 minutes. Contact your Superadmin to reset if needed." },
   { q: "How do I change my assigned facility?", a: "Facility assignments are managed by the Superadmin. Contact them to update your assignment." },
@@ -46,7 +46,7 @@ export default function SettingsTab({ user, addToast }: SettingsTabProps) {
     addToast("Password updated successfully.", "success");
   };
 
-  const roleLabel = user.role === "superadmin" ? "Super Admin" : `${user.facility} Admin`;
+  const roleLabel = user.role === "superadmin" ? "Super Admin" : user.role === "requester" ? "Facility Requester" : `${user.facility} Admin`;
 
   const inputStyle: React.CSSProperties = {
     flex: 1, padding: "9px 0", border: "none", fontSize: 13,

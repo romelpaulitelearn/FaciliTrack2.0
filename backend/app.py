@@ -25,6 +25,7 @@ app.add_middleware(
 
 DB_NAME = os.getenv("D1_DATABASE_NAME", "facilitrack-db")
 LOCAL_DB_PATH = os.path.join(os.path.dirname(__file__), "facilitrack_local.db")
+ALL_FACILITIES = ["Computer Laboratory", "Science & Physics Lab", "Tertiary Classroom", "Hotel Restaurant Management", "Gymnasium"]
 
 
 class AdminCreateRequest(BaseModel):
@@ -54,8 +55,27 @@ class LoginResponse(BaseModel):
     id: str
     name: str
     username: str
-    role: Literal["superadmin", "admin"]
+    role: Literal["superadmin", "admin", "requester"]
     facility: Optional[str] = None
+    facilities: list[str] = []
+
+
+class ReservationCreateRequest(BaseModel):
+    email: str = Field(..., min_length=1)
+    phone: Optional[str] = None
+    dateNeeded: str = Field(..., min_length=1)
+    timeNeeded: str = Field(..., min_length=1)
+    facility: str = Field(..., min_length=1)
+    accountabilityName: str = Field(..., min_length=1)
+    department: str = Field(..., min_length=1)
+    gradeOrCourse: str = Field(..., min_length=1)
+    subject: str = Field(..., min_length=1)
+    totalStudents: int = Field(..., ge=1)
+
+
+class ReservationStatusUpdateRequest(BaseModel):
+    status: Literal["Pending", "Accepted", "Declined"]
+    rejectionReason: Optional[str] = None
 
 
 def find_d1_database_path() -> Optional[str]:
@@ -109,6 +129,13 @@ def normalize_facility_value(value) -> str:
     return str(value).strip()
 
 
+def expand_admin_facilities(value) -> list[str]:
+    raw = str(value or "").strip()
+    if raw.casefold() == "all facilities":
+        return ALL_FACILITIES.copy()
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 def ensure_local_super_admin_table() -> None:
     conn = sqlite3.connect(LOCAL_DB_PATH)
     columns = conn.execute("PRAGMA table_info(super_admins)").fetchall()
@@ -159,9 +186,58 @@ def ensure_local_admin_table() -> None:
     conn.close()
 
 
+def ensure_local_requester_table() -> None:
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS requesters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL DEFAULT '',
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Active',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def ensure_local_reservations_table() -> None:
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reservations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            phone TEXT,
+            date_filed TEXT NOT NULL,
+            date_needed TEXT NOT NULL,
+            time_needed TEXT NOT NULL,
+            facility TEXT NOT NULL,
+            accountability_name TEXT NOT NULL,
+            department TEXT NOT NULL,
+            grade_course_year TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            total_students INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            rejection_reason TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
 def seed_default_accounts() -> None:
     ensure_local_admin_table()
     ensure_local_super_admin_table()
+    ensure_local_requester_table()
     conn = sqlite3.connect(LOCAL_DB_PATH)
     default_rows = [
         (
@@ -184,11 +260,56 @@ def seed_default_accounts() -> None:
         ),
         (
             "admins",
+            "admin2",
+            "Admin Two",
+            "admin2@school.edu",
+            "ChangeMe123!",
+            "Science & Physics Lab",
+            "Active",
+        ),
+        (
+            "admins",
+            "admin3",
+            "Admin Three",
+            "admin3@school.edu",
+            "ChangeMe123!",
+            "Tertiary Classroom",
+            "Active",
+        ),
+        (
+            "admins",
+            "admin4",
+            "Admin Four",
+            "admin4@school.edu",
+            "ChangeMe123!",
+            "Hotel Restaurant Management",
+            "Active",
+        ),
+        (
+            "admins",
+            "admin5",
+            "Admin Five",
+            "admin5@school.edu",
+            "ChangeMe123!",
+            "Gymnasium",
+            "Active",
+        ),
+        (
+            "admins",
             "jj.himenez",
             "Jose Himenez",
             "jj.himenez@school.edu",
             "ChangeMe123!",
-            "Computer Laboratory",
+            "All Facilities",
+            "Active",
+        ),
+        (
+            "requesters",
+            "requester1",
+            "Facility Requester",
+            "requester1@school.edu",
+            "Requester123!",
+            "",
             "Active",
         ),
     ]
@@ -206,7 +327,7 @@ def seed_default_accounts() -> None:
                     "INSERT INTO super_admins (email, fullname, username, password, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (email, name, username, password_value, facility_or_title, status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
                 )
-        else:
+        elif table_name == "admins":
             existing = conn.execute("SELECT id FROM admins WHERE username = ?", (username,)).fetchone()
             if existing:
                 conn.execute(
@@ -217,6 +338,18 @@ def seed_default_accounts() -> None:
                 conn.execute(
                     "INSERT INTO admins (name, email, username, password, facilities, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (name, email, username, password_value, facility_or_title, status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
+                )
+        else:
+            existing = conn.execute("SELECT id FROM requesters WHERE username = ?", (username,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE requesters SET name = ?, email = ?, password = ?, status = ?, updated_at = ? WHERE username = ?",
+                    (name, email, password_value, status, datetime.utcnow().isoformat(), username),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO requesters (name, email, username, password, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (name, email, username, password_value, status, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
                 )
 
     conn.commit()
@@ -330,6 +463,100 @@ def health():
     return {"status": "ok", "database_name": DB_NAME}
 
 
+def reservation_response(row):
+    return {
+        "id": str(row[0]),
+        "email": row[1],
+        "phone": row[2] or "",
+        "dateFiled": row[3],
+        "dateNeeded": row[4],
+        "timeNeeded": row[5],
+        "facility": row[6],
+        "accountabilityName": row[7],
+        "department": row[8],
+        "gradeOrCourse": row[9],
+        "subject": row[10],
+        "totalStudents": row[11],
+        "status": row[12],
+    }
+
+
+@app.get("/reservations")
+def list_reservations(facility: Optional[str] = None):
+    ensure_local_reservations_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    query = "SELECT id, email, phone, date_filed, date_needed, time_needed, facility, accountability_name, department, grade_course_year, subject, total_students, status FROM reservations"
+    values = []
+    if facility:
+        query += " WHERE facility = ?"
+        values.append(facility)
+    query += " ORDER BY id DESC"
+    rows = conn.execute(query, values).fetchall()
+    conn.close()
+    return [reservation_response(row) for row in rows]
+
+
+@app.post("/reservations")
+def create_reservation(payload: ReservationCreateRequest):
+    ensure_local_reservations_table()
+    now = datetime.utcnow().isoformat()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    cursor = conn.execute(
+        """
+        INSERT INTO reservations (
+            email, phone, date_filed, date_needed, time_needed, facility,
+            accountability_name, department, grade_course_year, subject,
+            total_students, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)
+        """,
+        (
+            payload.email.strip(),
+            (payload.phone or "").strip(),
+            now,
+            payload.dateNeeded,
+            payload.timeNeeded,
+            payload.facility,
+            payload.accountabilityName.strip(),
+            payload.department.strip(),
+            payload.gradeOrCourse.strip(),
+            payload.subject.strip(),
+            payload.totalStudents,
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, email, phone, date_filed, date_needed, time_needed, facility, accountability_name, department, grade_course_year, subject, total_students, status FROM reservations WHERE id = ?",
+        (cursor.lastrowid,),
+    ).fetchone()
+    conn.close()
+    return reservation_response(row)
+
+
+@app.put("/reservations/{reservation_id}")
+def update_reservation_status(reservation_id: int, payload: ReservationStatusUpdateRequest):
+    ensure_local_reservations_table()
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    existing = conn.execute("SELECT id FROM reservations WHERE id = ?", (reservation_id,)).fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Reservation not found.")
+
+    now = datetime.utcnow().isoformat()
+    conn.execute(
+        "UPDATE reservations SET status = ?, rejection_reason = ?, updated_at = ? WHERE id = ?",
+        (payload.status, (payload.rejectionReason or "").strip(), now, reservation_id),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, email, phone, date_filed, date_needed, time_needed, facility, accountability_name, department, grade_course_year, subject, total_students, status FROM reservations WHERE id = ?",
+        (reservation_id,),
+    ).fetchone()
+    conn.close()
+    return reservation_response(row)
+
+
 @app.get("/admins")
 def list_admins():
     ensure_local_admin_table()
@@ -344,7 +571,7 @@ def list_admins():
             "name": row[1],
             "email": row[2] or f"{row[3]}@school.edu",
             "username": row[3],
-            "facilities": [item.strip() for item in (row[4] or "").split(",") if item.strip()],
+                    "facilities": ["All Facilities"] if str(row[4] or "").strip().casefold() == "all facilities" else expand_admin_facilities(row[4]),
             "status": row[5],
         }
         for row in rows
@@ -365,7 +592,10 @@ def create_admin(payload: AdminCreateRequest):
             raise HTTPException(status_code=409, detail="Username already exists.")
 
         created = create_local_admin(payload)
-        persist_admin_to_d1(payload)
+        try:
+            persist_admin_to_d1(payload)
+        except Exception as exc:
+            print(f"[cloudflare-sync] admin create skipped: {exc}")
         sync_local_db_to_d1()
         return created
     except HTTPException:
@@ -378,7 +608,10 @@ def create_admin(payload: AdminCreateRequest):
 def delete_admin(admin_id: int):
     try:
         result = delete_local_admin(admin_id)
-        delete_admin_from_d1(admin_id)
+        try:
+            delete_admin_from_d1(admin_id)
+        except Exception as exc:
+            print(f"[cloudflare-sync] admin delete skipped: {exc}")
         sync_local_db_to_d1()
         return result
     except HTTPException:
@@ -405,8 +638,15 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
         updates.append("email = ?")
         values.append(payload.email.strip() or "")
     if payload.username is not None:
+        duplicate = conn.execute(
+            "SELECT id FROM admins WHERE username = ? AND id != ?",
+            (payload.username.strip(), admin_id),
+        ).fetchone()
+        if duplicate:
+            conn.close()
+            raise HTTPException(status_code=409, detail="Username already exists.")
         updates.append("username = ?")
-        values.append(payload.username)
+        values.append(payload.username.strip())
     if payload.password is not None:
         updates.append("password = ?")
         values.append(payload.password)
@@ -422,11 +662,18 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
         raise HTTPException(status_code=400, detail="No fields to update.")
 
     values.extend([datetime.utcnow().isoformat(), admin_id])
-    conn.execute(f"UPDATE admins SET {', '.join(updates)}, updated_at = ? WHERE id = ?", values)
+    try:
+        conn.execute(f"UPDATE admins SET {', '.join(updates)}, updated_at = ? WHERE id = ?", values)
+    except sqlite3.IntegrityError as exc:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Username already exists.") from exc
     conn.commit()
     updated = conn.execute("SELECT id, name, email, username, facilities, status FROM admins WHERE id = ?", (admin_id,)).fetchone()
     conn.close()
-    sync_local_db_to_d1()
+    try:
+        sync_local_db_to_d1()
+    except Exception as exc:
+        print(f"[cloudflare-sync] admin update skipped: {exc}")
     return {
         "id": updated[0],
         "name": updated[1],
@@ -441,14 +688,15 @@ def update_admin(admin_id: int, payload: AdminUpdateRequest):
 def login(payload: LoginRequest):
     try:
         seed_default_accounts()
+        username = payload.username.strip().casefold()
         d1_db_path = find_d1_database_path()
 
         if d1_db_path and os.path.exists(d1_db_path):
             conn = sqlite3.connect(d1_db_path)
 
             super_row = conn.execute(
-                "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? LIMIT 1",
-                (payload.username,),
+                "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+                (username,),
             ).fetchone()
             if super_row:
                 db_id, db_name, db_username, db_password, db_status = super_row
@@ -462,19 +710,21 @@ def login(payload: LoginRequest):
                     ).model_dump()
 
             admin_row = conn.execute(
-                "SELECT id, fullname, username, password, facilities_assign, status FROM admins WHERE username = ? LIMIT 1",
-                (payload.username,),
+                "SELECT id, fullname, username, password, facilities_assign, status FROM admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+                (username,),
             ).fetchone()
             if admin_row:
                 db_id, db_name, db_username, db_password, db_facility, db_status = admin_row
                 if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+                    assigned_facilities = expand_admin_facilities(db_facility)
                     conn.close()
                     return LoginResponse(
                         id=str(db_id),
                         name=db_name,
                         username=db_username,
                         role="admin",
-                        facility=normalize_facility_value(db_facility),
+                        facility=assigned_facilities[0] if assigned_facilities else None,
+                        facilities=assigned_facilities,
                     ).model_dump()
             conn.close()
 
@@ -483,8 +733,8 @@ def login(payload: LoginRequest):
         conn = sqlite3.connect(LOCAL_DB_PATH)
 
         local_super_row = conn.execute(
-            "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? LIMIT 1",
-            (payload.username,),
+            "SELECT id, fullname, username, password, status FROM super_admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+            (username,),
         ).fetchone()
         if local_super_row:
             db_id, db_name, db_username, db_password, db_status = local_super_row
@@ -498,19 +748,35 @@ def login(payload: LoginRequest):
                 ).model_dump()
 
         local_admin_row = conn.execute(
-            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? LIMIT 1",
-            (payload.username,),
+            "SELECT id, name, username, password, facilities, status FROM admins WHERE username = ? COLLATE NOCASE LIMIT 1",
+            (username,),
         ).fetchone()
         if local_admin_row:
             db_id, db_name, db_username, db_password, db_facilities, db_status = local_admin_row
             if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+                assigned_facilities = expand_admin_facilities(db_facilities)
                 conn.close()
                 return LoginResponse(
                     id=str(db_id),
                     name=db_name,
                     username=db_username,
                     role="admin",
-                    facility=normalize_facility_value(db_facilities),
+                    facility=assigned_facilities[0] if assigned_facilities else None,
+                    facilities=assigned_facilities,
+                ).model_dump()
+        local_requester_row = conn.execute(
+            "SELECT id, name, username, password, status FROM requesters WHERE username = ? COLLATE NOCASE LIMIT 1",
+            (username,),
+        ).fetchone()
+        if local_requester_row:
+            db_id, db_name, db_username, db_password, db_status = local_requester_row
+            if password_matches(db_password, payload.password) and str(db_status or "").strip().lower() == "active":
+                conn.close()
+                return LoginResponse(
+                    id=str(db_id),
+                    name=db_name,
+                    username=db_username,
+                    role="requester",
                 ).model_dump()
         conn.close()
 

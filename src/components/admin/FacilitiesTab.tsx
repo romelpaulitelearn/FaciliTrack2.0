@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Clock, Users, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { FACILITIES_DATA, getFacilityByName, type Facility, type FacilityRoom } from "../../facilityData";
-import type { User } from "../../types";
+import type { Room, User } from "../../types";
 
 function FacilitySection({ facility, rooms }: { facility: Facility; rooms: FacilityRoom[] }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -127,10 +127,10 @@ function FacilitySection({ facility, rooms }: { facility: Facility; rooms: Facil
   );
 }
 
-export default function FacilitiesTab({ user, rooms }: { user?: User; rooms?: unknown }) {
+export default function FacilitiesTab({ user, rooms }: { user?: User; rooms?: Room[] }) {
   const assignedFacility = user?.facility ? getFacilityByName(user.facility.trim()) : undefined;
   const filteredFacilities = user?.role === "admin"
-    ? (assignedFacility ? [assignedFacility] : [])
+    ? (assignedFacility ? [{ ...assignedFacility, rooms: rooms ?? assignedFacility.rooms }] : [])
     : FACILITIES_DATA;
   const totalAvailable = filteredFacilities.reduce((s, f) => s + f.rooms.filter((r) => r.status === "Available").length, 0);
   const totalOccupied = filteredFacilities.reduce((s, f) => s + f.rooms.filter((r) => r.status === "Occupied").length, 0);
