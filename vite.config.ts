@@ -38,6 +38,14 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:8000',
           changeOrigin: true,
         },
+        '/forgot-password': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
+        '/change-password': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
         '/admins': {
           target: 'http://localhost:8000',
           changeOrigin: true,

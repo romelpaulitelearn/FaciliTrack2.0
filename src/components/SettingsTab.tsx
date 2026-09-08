@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Eye, EyeOff, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import type { User as UserType } from "../types";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8443")).replace(/\/$/, "");
+
 interface SettingsTabProps {
   user: UserType;
   addToast: (msg: string, type?: "success" | "error" | "info") => void;
@@ -38,15 +40,26 @@ export default function SettingsTab({ user, addToast }: SettingsTabProps) {
   const [showPw, setShowPw] = useState(false);
   const [textSize, setTextSize] = useState(14);
 
-  const handlePwUpdate = (e: React.FormEvent) => {
+  const handlePwUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPw !== confirmPw) { addToast("Passwords do not match.", "error"); return; }
     if (newPw.length < 6) { addToast("Password must be at least 6 characters.", "error"); return; }
-    setCurrentPw(""); setNewPw(""); setConfirmPw("");
-    addToast("Password updated successfully.", "success");
+    try {
+      const response = await fetch(`${API_BASE_URL}/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, currentPassword: currentPw, newPassword: newPw }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || "Unable to update password.");
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+      addToast(result.message || "Password updated successfully.", "success");
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : "Unable to update password.", "error");
+    }
   };
 
-  const roleLabel = user.role === "superadmin" ? "Super Admin" : user.role === "requester" ? "Facility Requester" : `${user.facility} Admin`;
+  const roleLabel = user.role === "superadmin" ? "Super Admin" : user.role === "requester" ? "Student" : `${user.facility} Admin`;
 
   const inputStyle: React.CSSProperties = {
     flex: 1, padding: "9px 0", border: "none", fontSize: 13,
