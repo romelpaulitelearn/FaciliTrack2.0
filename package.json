@@ -3,15 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "engines": {
-    "node": "18.x"
-  },
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:backend": "python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000",
     "dev:full": "python scripts/dev.py",
     "build": "vite build",
-    "vercel-build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
     "db:sync": "python scripts/sync_cloudflare_d1.py",
